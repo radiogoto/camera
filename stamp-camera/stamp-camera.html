@@ -373,7 +373,7 @@
     <img id="modal-photo" alt="撮影した写真">
     <div id="modal-actions">
       <button class="m-btn close-btn" id="modal-close">閉じる</button>
-      <button class="m-btn save" id="modal-save">💾 保存 (JPEG)</button>
+      <button class="m-btn save" id="modal-save" id="modal-save">💾 保存</button>
     </div>
   </div>
 </div>
@@ -741,14 +741,46 @@ function capturePhoto() {
 }
 
 // ── 保存 ──
-modalSave.addEventListener('click', () => {
+modalSave.addEventListener('click', async () => {
   if (!lastPhoto) return;
-  const a = document.createElement('a');
+
   const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  a.download = `stamp-photo-${ts}.jpg`;
+  const filename = `stamp-photo-${ts}.jpg`;
+
+  const isIOS     = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isAndroid = /android/i.test(navigator.userAgent);
+
+  // ── iOS Safari：Web Share API → 「画像を保存」でカメラロールへ ──
+  if (isIOS && navigator.canShare) {
+    try {
+      const res  = await fetch(lastPhoto);
+      const blob = await res.blob();
+      const file = new File([blob], filename, { type: 'image/jpeg' });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file] });
+        showToast('カメラロールに保存できます！');
+        modalBg.classList.remove('open');
+        return;
+      }
+    } catch(e) {
+      if (e.name === 'AbortError') return; // ユーザーがキャンセル
+    }
+  }
+
+  // ── Android Chrome：ダウンロード → ギャラリーに自動追加 ──
+  // ── PC：通常ダウンロード ──
+  const a = document.createElement('a');
+  a.download = filename;
   a.href = lastPhoto;
+  document.body.appendChild(a);
   a.click();
-  showToast('保存しました！');
+  document.body.removeChild(a);
+
+  if (isAndroid) {
+    showToast('ギャラリーの「ダウンロード」に保存されました！');
+  } else {
+    showToast('保存しました！');
+  }
   modalBg.classList.remove('open');
 });
 modalClose.addEventListener('click', () => modalBg.classList.remove('open'));
@@ -775,6 +807,14 @@ function showToast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
 }
+
+// ── 保存ボタンのラベルを端末に合わせて変更 ──
+const _isIOS     = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const _isAndroid = /android/i.test(navigator.userAgent);
+document.getElementById('modal-save').textContent =
+  _isIOS     ? '📷 カメラロールに保存' :
+  _isAndroid ? '📥 ギャラリーに保存' :
+               '💾 保存 (JPEG)';
 
 // ── キーボード ──
 document.addEventListener('keydown', e => {
