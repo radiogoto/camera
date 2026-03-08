@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- 胴体 -->
+  <ellipse cx="108" cy="130" rx="62" ry="44" fill="#1a1a1a"/>
+
+  <!-- 首 -->
+  <path d="M68 108 Q60 90 72 76 Q80 66 92 72 L88 108 Z" fill="#1a1a1a"/>
+
+  <!-- 頭 -->
+  <ellipse cx="76" cy="66" rx="30" ry="26" fill="#1a1a1a"/>
+
+  <!-- 耳（左） -->
+  <ellipse cx="50" cy="52" rx="10" ry="14" fill="#1a1a1a" transform="rotate(-20 50 52)"/>
+  <ellipse cx="50" cy="52" rx="5" ry="8" fill="#444" transform="rotate(-20 50 52)"/>
+
+  <!-- 耳（右） -->
+  <ellipse cx="98" cy="46" rx="10" ry="14" fill="#1a1a1a" transform="rotate(15 98 46)"/>
+  <ellipse cx="98" cy="46" rx="5" ry="8" fill="#444" transform="rotate(15 98 46)"/>
+
+  <!-- 目 -->
+  <circle cx="66" cy="62" r="6" fill="white"/>
+  <circle cx="68" cy="63" r="3" fill="#111"/>
+  <circle cx="69" cy="62" r="1" fill="white"/>
+
+  <!-- 鼻 -->
+  <ellipse cx="72" cy="78" rx="12" ry="8" fill="#333"/>
+  <circle cx="68" cy="78" r="3" fill="#111"/>
+  <circle cx="76" cy="78" r="3" fill="#111"/>
+
+  <!-- 角（左） -->
+  <path d="M54 42 Q44 28 50 20 Q54 28 58 40 Z" fill="#555"/>
+  <!-- 角（右） -->
+  <path d="M92 38 Q98 24 106 20 Q102 30 96 42 Z" fill="#555"/>
+
+  <!-- 首の鈴 -->
+  <circle cx="80" cy="96" r="8" fill="#555" stroke="#888" stroke-width="1"/>
+  <line x1="77" y1="100" x2="83" y2="100" stroke="#333" stroke-width="1.5"/>
+  <circle cx="80" cy="103" r="2" fill="#333"/>
+
+  <!-- 脚（4本） -->
+  <rect x="68" y="166" width="14" height="24" rx="6" fill="#1a1a1a"/>
+  <rect x="88" y="168" width="14" height="22" rx="6" fill="#1a1a1a"/>
+  <rect x="118" y="166" width="14" height="24" rx="6" fill="#1a1a1a"/>
+  <rect x="138" y="168" width="14" height="22" rx="6" fill="#1a1a1a"/>
+
+  <!-- ひづめ -->
+  <rect x="68" y="184" width="14" height="8" rx="4" fill="#555"/>
+  <rect x="88" y="184" width="14" height="8" rx="4" fill="#555"/>
+  <rect x="118" y="184" width="14" height="8" rx="4" fill="#555"/>
+  <rect x="138" y="184" width="14" height="8" rx="4" fill="#555"/>
+
+  <!-- しっぽ -->
+  <path d="M170 126 Q190 110 188 92 Q186 80 178 82" fill="none" stroke="#1a1a1a" stroke-width="6" stroke-linecap="round"/>
+  <!-- しっぽの毛 -->
+  <ellipse cx="178" cy="80" rx="8" ry="5" fill="#333" transform="rotate(-20 178 80)"/>
+
+  <!-- 胴体の模様（白ライン） -->
+  <ellipse cx="118" cy="128" rx="30" ry="20" fill="none" stroke="white" stroke-width="1.5" opacity="0.12"/>
+
+  <!-- 目の白ハイライト -->
+  <circle cx="66" cy="60" r="2" fill="white" opacity="0.6"/>
+</svg>

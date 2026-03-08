@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- 実（上中央にくぼみあり） -->
+  <path d="M100 168 C58 168 26 138 26 102 C26 66 48 42 74 36 C82 28 92 24 100 28 C108 24 118 28 126 36 C152 42 174 66 174 102 C174 138 142 168 100 168 Z"
+    fill="#1a1a1a"/>
+  <!-- くぼみの縦ライン -->
+  <path d="M100 30 Q97 100 100 168" fill="none" stroke="#444" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- 葉 -->
+  <path d="M102 28 Q124 8 148 16 Q126 28 102 28 Z" fill="#333"/>
+  <!-- 枝 -->
+  <line x1="102" y1="28" x2="110" y2="10" stroke="#444" stroke-width="3" stroke-linecap="round"/>
+  <!-- ハイライト -->
+  <ellipse cx="70" cy="84" rx="18" ry="12" fill="white" opacity="0.1" transform="rotate(-25 70 84)"/>
+</svg>

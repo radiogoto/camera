@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- 吹き出し本体 -->
+  <path d="M20 30 Q20 16 34 16 L166 16 Q180 16 180 30 L180 118 Q180 132 166 132 L80 132 L58 168 L62 132 L34 132 Q20 132 20 118 Z"
+    fill="#1a1a1a" stroke="none"/>
+  <!-- テキスト HELLO -->
+  <text x="100" y="88" text-anchor="middle"
+    font-family="'Arial Black', 'Arial', sans-serif"
+    font-size="40" font-weight="900"
+    fill="white" letter-spacing="2">HELLO</text>
+  <!-- デコライン（上） -->
+  <line x1="38" y1="44" x2="162" y2="44" stroke="white" stroke-width="1.5" opacity="0.25"/>
+  <!-- デコライン（下） -->
+  <line x1="38" y1="114" x2="162" y2="114" stroke="white" stroke-width="1.5" opacity="0.25"/>
+</svg>
