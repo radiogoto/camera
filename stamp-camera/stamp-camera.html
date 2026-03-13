@@ -27,9 +27,8 @@
     user-select: none; -webkit-user-select: none;
   }
 
-  #app { display: flex; flex-direction: column; min-height: 100dvh; }
+  #app { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
 
-  /* ── オーバーレイボタン（ビューファインダー右上） ── */
   /* ── ビューファインダー ── */
   #viewfinder {
     position: relative;
@@ -37,7 +36,8 @@
     aspect-ratio: 1000 / 1250;
     background: #000;
     overflow: hidden;
-    flex-shrink: 0;
+    flex-shrink: 1; /* パレット・コントロールに押されたら縮む */
+    min-height: 0;
   }
 
   /* 不要になった viewfinder-clip は削除 */
