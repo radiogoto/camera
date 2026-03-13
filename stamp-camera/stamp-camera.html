@@ -733,10 +733,10 @@ function capturePhoto() {
   }
   tmpCtx.drawImage(video, 0, 0, vw, vh);
 
-  // 2) getContain: 映像(vw×vh)をコンテナ(rect)にcontainした領域を求める
-  //    → tempCanvasのどの部分がコンテナに見えているかを計算
-  const videoAspect    = vw / vh;
-  const containerAspect = rect.width / rect.height;
+  // 2) getContain: 映像(vw×vh)をコンテナ(4:5固定)にcontainした領域を求める
+  //    containerAspect は表示サイズではなく出力比率(1000/1250)で固定
+  const videoAspect     = vw / vh;
+  const containerAspect = 1000 / 1250;  // 出力キャンバスと同じ比率で固定
   let containW, containH, containX, containY;
   if (videoAspect > containerAspect) {
     containW = vw;
@@ -757,8 +757,9 @@ function capturePhoto() {
   ctx.drawImage(tmpCanvas, containX, containY, containW, containH, 0, 0, canvas.width, canvas.height);
 
   // スタンプ座標変換（表示px → canvas px）
+  // dispH は rect.height ではなく、表示幅から 4:5 比率で算出した論理高さを使う
   const dispW = rect.width;
-  const dispH = rect.height;
+  const dispH = rect.width * (1250 / 1000);  // 4:5固定比率
   const stampScaleX = canvas.width  / dispW;
   const stampScaleY = canvas.height / dispH;
 
