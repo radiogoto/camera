@@ -33,18 +33,20 @@
   #viewfinder {
     position: relative;
     width: 100%;
-    aspect-ratio: 1000 / 1250;
     background: #000;
     overflow: hidden;
-    flex-shrink: 1; /* パレット・コントロールに押されたら縮む */
+    flex-shrink: 1;
     min-height: 0;
   }
 
-  /* 不要になった viewfinder-clip は削除 */
-
-  /* video はJSでサイズ・位置をセット（ドラえもんカメラと同じ方式） */
+  /* video-container は常に4:5を維持して中央配置 */
+  /* viewfinderが縮んでも、このコンテナは4:5のまま → overflow:hiddenでクリップ */
   #video-container {
-    position: absolute; inset: 0;
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    aspect-ratio: 1000 / 1250;
     overflow: hidden;
   }
 
@@ -303,12 +305,14 @@
       <button id="start-btn">カメラを起動</button>
     </div>
 
+    <!-- video-container が常に 4:5 を維持する基準コンテナ -->
+    <!-- stamp・flash・hint もここに入れて座標を統一 -->
     <div id="video-container">
       <video id="video" autoplay playsinline muted></video>
+      <div id="stamp-container"></div>
+      <div id="flash"></div>
+      <div id="hint">スタンプをタップして追加 ✦ ドラッグで移動 ✦ ピンチで拡縮</div>
     </div>
-    <div id="stamp-container"></div>
-    <div id="flash"></div>
-    <div id="hint">スタンプをタップして追加 ✦ ドラッグで移動 ✦ ピンチで拡縮</div>
   </div>
 
   <!-- スタンプパレット -->
@@ -403,58 +407,80 @@ let stamps = []; // {el, emoji, imgSrc, x, y, scale, rot}
 
 
 // ── ドラえもんカメラと同じ getCover 計算 ──
-// コンテナ(s)に対して映像(r)をcoverで表示するpx値を返す
 function getCover(s, r) {
   const sAspect = s.width / s.height;
   const rAspect = r.width / r.height;
   let w, h, x, y;
   if (sAspect > rAspect) {
-    // コンテナが横長 → 幅に合わせて上下にはみ出す
-    w = s.width;
-    h = w / rAspect;
-    x = 0;
-    y = -(h - s.height) / 2;
+    w = s.width; h = w / rAspect; x = 0; y = -(h - s.height) / 2;
   } else {
-    // コンテナが縦長 → 高さに合わせて左右にはみ出す
-    h = s.height;
-    w = h * rAspect;
-    y = 0;
-    x = -(w - s.width) / 2;
+    h = s.height; w = h * rAspect; y = 0; x = -(w - s.width) / 2;
   }
   return { width: w, height: h, x, y };
 }
 
-// 表示クロップの状態をグローバルに保持（撮影時に同じ値を使う）
-let cropState = null; // { srcX, srcY, srcW, srcH } 映像ピクセル座標
+// 表示クロップの状態をグローバルに保持
+let cropState = null;
+let videoRotated = false; // 横長映像を90度回転して使うフラグ
 
 function applyVideoCover() {
-  const vw = video.videoWidth;
-  const vh = video.videoHeight;
+  let vw = video.videoWidth;
+  let vh = video.videoHeight;
   if (!vw || !vh) return;
   const container = document.getElementById('video-container');
   const cw = container.offsetWidth;
   const ch = container.offsetHeight;
   if (!cw || !ch) return;
 
-  // 表示用: コンテナに対してcoverでvideoを配置
-  const p = getCover({ width: cw, height: ch }, { width: vw, height: vh });
-  video.style.width  = p.width  + 'px';
-  video.style.height = p.height + 'px';
-  video.style.left   = p.x + 'px';
-  video.style.top    = p.y + 'px';
+  // 横長映像（16:9など）がモバイルで来た場合は回転フラグを立てる
+  // コンテナは縦長（4:5）なので、横長映像はそのままだと大きくクロップされる
+  // → 縦横を入れ替えてcoverすることで自然な画角にする
+  const isMobile = /iphone|ipad|ipod|android/i.test(navigator.userAgent);
+  videoRotated = isMobile && (vw > vh);
 
-  // 撮影用: 表示と同じクロップ範囲を映像ピクセル座標で保存
-  // p.x, p.y は負値（はみ出し量）なので、映像上の見えている領域を逆算
-  const scaleX = vw / p.width;   // 表示px → 映像px の比率
-  const scaleY = vh / p.height;
-  cropState = {
-    srcX: (-p.x) * scaleX,
-    srcY: (-p.y) * scaleY,
-    srcW:  cw    * scaleX,
-    srcH:  ch    * scaleY,
-    dispW: cw,
-    dispH: ch,
-  };
+  if (videoRotated) {
+    // 縦横を入れ替えてcoverに使う
+    [vw, vh] = [vh, vw];
+    // videoを90度回転してコンテナに収める
+    const p = getCover({ width: cw, height: ch }, { width: vw, height: vh });
+    // 回転+中央配置
+    video.style.width  = p.height + 'px'; // 回転後は width/height が入れ替わる
+    video.style.height = p.width  + 'px';
+    video.style.left   = (cw / 2) + 'px';
+    video.style.top    = (ch / 2) + 'px';
+    video.style.transform = `translate(-50%, -50%) rotate(90deg)`;
+    // cropStateも回転後の座標で保存
+    const scaleX = video.videoHeight / p.width;
+    const scaleY = video.videoWidth  / p.height;
+    cropState = {
+      srcX: (-p.x) * scaleX,
+      srcY: (-p.y) * scaleY,
+      srcW:  cw    * scaleX,
+      srcH:  ch    * scaleY,
+      dispW: cw,
+      dispH: ch,
+      rotated: true,
+    };
+  } else {
+    // 通常（縦長・正方形映像）
+    video.style.transform = '';
+    const p = getCover({ width: cw, height: ch }, { width: vw, height: vh });
+    video.style.width  = p.width  + 'px';
+    video.style.height = p.height + 'px';
+    video.style.left   = p.x + 'px';
+    video.style.top    = p.y + 'px';
+    const scaleX = vw / p.width;
+    const scaleY = vh / p.height;
+    cropState = {
+      srcX: (-p.x) * scaleX,
+      srcY: (-p.y) * scaleY,
+      srcW:  cw    * scaleX,
+      srcH:  ch    * scaleY,
+      dispW: cw,
+      dispH: ch,
+      rotated: false,
+    };
+  }
 }
 
 // ① ResizeObserver でビューファインダーのサイズ変化を確実に検知
@@ -739,80 +765,66 @@ function doFlash() {
 function capturePhoto() {
   const vw = video.videoWidth;
   const vh = video.videoHeight;
-  if (!vw || !vh) { showToast('カメラが準備中です'); return; }
+  if (!vw || !vh)   { showToast('カメラが準備中です'); return; }
+  if (!cropState)   { showToast('カメラが準備中です'); return; }
 
-  const container = document.getElementById('video-container');
-  const rect = container.getBoundingClientRect();
-
-  // ── ドラえもんカメラの setBaseCanvasVideo と同じ計算 ──
-  // 1) 映像全体を一旦 tempCanvas に描く（フロントカメラは反転）
-  const tmpCanvas = document.createElement('canvas');
-  tmpCanvas.width  = vw;
-  tmpCanvas.height = vh;
-  const tmpCtx = tmpCanvas.getContext('2d');
-  if (facingMode === 'user') {
-    tmpCtx.translate(vw, 0);
-    tmpCtx.scale(-1, 1);
-  }
-  tmpCtx.drawImage(video, 0, 0, vw, vh);
-
-  // 2) 映像を 4:5 にクロップする（coverと同じ考え方）
-  //    映像の中心から 4:5 の範囲を切り出す
-  const videoAspect     = vw / vh;
-  const containerAspect = 1000 / 1250;  // 出力 4:5 固定
-  let containW, containH, containX, containY;
-  if (videoAspect > containerAspect) {
-    // 映像が横長 → 高さを合わせて横をクロップ
-    containH = vh;
-    containW = vh * containerAspect;
-    containY = 0;
-    containX = (vw - containW) / 2;
-  } else {
-    // 映像が縦長（iPhoneなど）→ 幅を合わせて縦をクロップ
-    containW = vw;
-    containH = vw / containerAspect;
-    containX = 0;
-    containY = (vh - containH) / 2;
-  }
-
-  // 3) 出力canvas = 4:5固定 (1000×1250)
-  canvas.width  = 1000;
-  canvas.height = 1250;
+  const { srcX, srcY, srcW, srcH, dispW, dispH, rotated } = cropState;
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  canvas.width  = Math.round(dispW * dpr);
+  canvas.height = Math.round(dispH * dpr);
   const ctx = canvas.getContext('2d');
-  ctx.drawImage(tmpCanvas, containX, containY, containW, containH, 0, 0, canvas.width, canvas.height);
 
-  // スタンプ座標変換（表示px → canvas px）
-  // dispH は rect.height ではなく、表示幅から 4:5 比率で算出した論理高さを使う
-  const dispW = rect.width;
-  const dispH = rect.width * (1250 / 1000);  // 4:5固定比率
-  const stampScaleX = canvas.width  / dispW;
-  const stampScaleY = canvas.height / dispH;
+  if (rotated) {
+    // 横長映像を90度回転して描画
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(Math.PI / 2);
+    // 回転後: canvas の width/height が入れ替わった状態で描画
+    ctx.drawImage(video,
+      srcY, srcX, srcH, srcW,   // 回転時は x↔y, w↔h を入れ替え
+      -canvas.height / 2, -canvas.width / 2, canvas.height, canvas.width);
+    ctx.restore();
+  } else if (facingMode === 'user') {
+    // フロントカメラ：左右反転
+    ctx.save();
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video,
+      vw - srcX - srcW, srcY, srcW, srcH,
+      0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  } else {
+    ctx.drawImage(video,
+      srcX, srcY, srcW, srcH,
+      0, 0, canvas.width, canvas.height);
+  }
 
-  const drawStamps = () => {
-    const sorted = [...stamps].sort((a, b) =>
-      parseInt(a.el.style.zIndex) - parseInt(b.el.style.zIndex)
-    );
-    let pending = sorted.length;
-    if (pending === 0) { finalize(); return; }
+  // スタンプ描画
+  const scaleX = canvas.width  / dispW;
+  const scaleY = canvas.height / dispH;
+  const sorted = [...stamps].sort((a, b) =>
+    parseInt(a.el.style.zIndex) - parseInt(b.el.style.zIndex)
+  );
+  let pending = sorted.length;
+  if (pending === 0) { finalize(); return; }
 
-    sorted.forEach(state => {
-      const img = new Image();
-      img.onload = () => {
-        const cx = state.x * stampScaleX;
-        const cy = state.y * stampScaleY;
-        const sw = 120 * state.scale * stampScaleX;
-        const sh = 120 * state.scale * stampScaleY;
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.drawImage(img, -sw / 2, -sh / 2, sw, sh);
-        ctx.restore();
-        pending--;
-        if (pending === 0) finalize();
-      };
-      img.onerror = () => { pending--; if (pending === 0) finalize(); };
-      img.src = state.imgSrc;
-    });
-  };
+  sorted.forEach(state => {
+    const img = new Image();
+    img.onload = () => {
+      const cx = state.x * scaleX;
+      const cy = state.y * scaleY;
+      const sw = 120 * state.scale * scaleX;
+      const sh = 120 * state.scale * scaleY;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.drawImage(img, -sw / 2, -sh / 2, sw, sh);
+      ctx.restore();
+      pending--;
+      if (pending === 0) finalize();
+    };
+    img.onerror = () => { pending--; if (pending === 0) finalize(); };
+    img.src = state.imgSrc;
+  });
 
   function finalize() {
     lastPhoto = canvas.toDataURL('image/jpeg', 0.93);
@@ -821,8 +833,6 @@ function capturePhoto() {
     modalPhoto.src = lastPhoto;
     modalBg.classList.add('open');
   }
-
-  drawStamps();
 }
 
 // ── 保存 ──
