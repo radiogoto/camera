@@ -37,17 +37,23 @@
     overflow: hidden;
     flex-shrink: 1;
     min-height: 0;
+    /* 高さは flex で決まる（パレット・コントロールの残り） */
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  /* video-container は常に4:5を維持して中央配置 */
-  /* viewfinderが縮んでも、このコンテナは4:5のまま → overflow:hiddenでクリップ */
+  /* video-container は viewfinder に収まる最大の4:5サイズ */
+  /* width も height も超えないように contain 的に配置 */
   #video-container {
-    position: absolute;
-    left: 50%; top: 50%;
-    transform: translate(-50%, -50%);
-    width: 100%;
+    position: relative;
+    /* 高さを viewfinder に合わせ、幅は4:5から計算 */
+    height: 100%;
     aspect-ratio: 1000 / 1250;
+    /* 万が一幅が画面を超える場合は幅基準に切り替え */
+    max-width: 100%;
     overflow: hidden;
+    flex-shrink: 0;
   }
 
   #video {
@@ -312,6 +318,12 @@
       <div id="stamp-container"></div>
       <div id="flash"></div>
       <div id="hint">スタンプをタップして追加 ✦ ドラッグで移動 ✦ ピンチで拡縮</div>
+      <pre id="debug-overlay" style="
+        position:absolute; top:8px; left:8px; z-index:999;
+        background:rgba(0,0,0,0.7); color:#0f0; font-size:11px;
+        padding:6px 10px; border-radius:6px; pointer-events:none;
+        line-height:1.6; font-family:monospace; white-space:pre;
+      "></pre>
     </div>
   </div>
 
@@ -480,6 +492,18 @@ function applyVideoCover() {
       dispH: ch,
       rotated: false,
     };
+  }
+
+  // デバッグ表示
+  const dbg = document.getElementById('debug-overlay');
+  if (dbg) {
+    const vf = document.getElementById('viewfinder');
+    dbg.textContent =
+      `映像: ${video.videoWidth}×${video.videoHeight}\n` +
+      `コンテナ: ${cw}×${ch}\n` +
+      `viewfinder: ${vf.offsetWidth}×${vf.offsetHeight}\n` +
+      `cropSrc: ${Math.round(cropState.srcX)},${Math.round(cropState.srcY)} ` +
+      `${Math.round(cropState.srcW)}×${Math.round(cropState.srcH)}`;
   }
 }
 
