@@ -27,39 +27,49 @@
     user-select: none; -webkit-user-select: none;
   }
 
-  #app { display: flex; flex-direction: column; height: 100dvh; }
+  #app { display: flex; flex-direction: column; min-height: 100dvh; }
 
-  /* ── Header ── */
-  #header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 14px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0; z-index: 10;
-    gap: 8px;
+  /* ── オーバーレイボタン（ビューファインダー右上） ── */
+  #overlay-btns {
+    position: absolute; top: 10px; right: 10px;
+    display: flex; gap: 6px;
+    z-index: 50;
+    pointer-events: auto;
   }
-  #header h1 { font-size: 13px; font-weight: 300; letter-spacing: 0.2em; color: var(--accent); white-space: nowrap; }
 
   .hbtn {
     display: flex; align-items: center; gap: 5px;
-    background: transparent; border: 1px solid var(--border);
-    color: var(--muted); font-family: inherit; font-size: 11px;
+    background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.25);
+    color: #fff; font-family: inherit; font-size: 11px;
     padding: 5px 10px; border-radius: 16px; cursor: pointer;
     transition: all 0.18s; white-space: nowrap; flex-shrink: 0;
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
   }
   .hbtn:hover { border-color: var(--accent); color: var(--accent); }
 
   /* ── ビューファインダー ── */
   #viewfinder {
-    flex: 1; position: relative; overflow: hidden;
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1000 / 1250;
     background: #000;
-    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  /* 不要になった viewfinder-clip は削除 */
+
+  /* video はJSでサイズ・位置をセット（ドラえもんカメラと同じ方式） */
+  #video-container {
+    position: absolute; inset: 0;
+    overflow: hidden;
   }
 
   #video {
     position: absolute;
     display: block; pointer-events: none;
-    /* JSで width/height/left/top をセット */
+    max-width: none; max-height: none;
+    /* width/height/left/top はJS（getCover）でセット */
   }
 
   /* スタンプコンテナ（videoの上に絶対配置） */
@@ -299,21 +309,6 @@
 <body>
 <div id="app">
 
-  <!-- Header -->
-  <div id="header">
-    <h1>💝 スタンプカメラ</h1>
-    <div style="display:flex;gap:6px;">
-      <button class="hbtn" id="flip-btn">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M1 4v6h6"/><path d="M23 20v-6h-6"/>
-          <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
-        </svg>
-        切替
-      </button>
-      <button class="hbtn" id="clear-btn">🗑 全消去</button>
-    </div>
-  </div>
-
   <!-- ビューファインダー -->
   <div id="viewfinder">
     <div id="placeholder">
@@ -325,10 +320,24 @@
       <button id="start-btn">カメラを起動</button>
     </div>
 
-    <video id="video" autoplay playsinline muted></video>
+    <div id="video-container">
+      <video id="video" autoplay playsinline muted></video>
+    </div>
     <div id="stamp-container"></div>
     <div id="flash"></div>
     <div id="hint">スタンプをタップして追加 ✦ ドラッグで移動 ✦ ピンチで拡縮</div>
+
+    <!-- オーバーレイボタン：viewfinder内・z-index最上位 -->
+    <div id="overlay-btns">
+      <button class="hbtn" id="flip-btn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M1 4v6h6"/><path d="M23 20v-6h-6"/>
+          <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
+        </svg>
+        切替
+      </button>
+      <button class="hbtn" id="clear-btn">🗑 全消去</button>
+    </div>
   </div>
 
   <!-- スタンプパレット -->
@@ -408,39 +417,43 @@ let selectedStamp = null;
 let stampZIndex = 10;
 let stamps = []; // {el, emoji, imgSrc, x, y, scale, rot}
 
-// ── 映像をビューファインダーに黒帯なしで表示 ──
-function fitVideo() {
+
+// ── ドラえもんカメラと同じ getCover 計算 ──
+// コンテナ(s)に対して映像(r)をcoverで表示するpx値を返す
+function getCover(s, r) {
+  const sAspect = s.width / s.height;
+  const rAspect = r.width / r.height;
+  let w, h, x, y;
+  if (sAspect > rAspect) {
+    // コンテナが横長 → 幅に合わせて上下にはみ出す
+    w = s.width;
+    h = w / rAspect;
+    x = 0;
+    y = -(h - s.height) / 2;
+  } else {
+    // コンテナが縦長 → 高さに合わせて左右にはみ出す
+    h = s.height;
+    w = h * rAspect;
+    y = 0;
+    x = -(w - s.width) / 2;
+  }
+  return { width: w, height: h, x, y };
+}
+
+function applyVideoCover() {
   const vw = video.videoWidth;
   const vh = video.videoHeight;
   if (!vw || !vh) return;
-
-  const dispW = stampContainer.clientWidth;
-  const dispH = stampContainer.clientHeight;
-  const videoAspect = vw / vh;
-  const dispAspect  = dispW / dispH;
-
-  let renderW, renderH;
-  if (videoAspect > dispAspect) {
-    // 映像が横長 → 高さに合わせて左右にはみ出す
-    renderH = dispH;
-    renderW = dispH * videoAspect;
-  } else {
-    // 映像が縦長 → 幅に合わせて上下にはみ出す
-    renderW = dispW;
-    renderH = dispW / videoAspect;
-  }
-
-  const offsetX = (dispW - renderW) / 2;
-  const offsetY = (dispH - renderH) / 2;
-
-  video.style.width  = renderW + 'px';
-  video.style.height = renderH + 'px';
-  video.style.left   = offsetX + 'px';
-  video.style.top    = offsetY + 'px';
+  const container = document.getElementById('video-container');
+  const rect = container.getBoundingClientRect();
+  const p = getCover({ width: rect.width, height: rect.height }, { width: vw, height: vh });
+  video.style.width  = p.width  + 'px';
+  video.style.height = p.height + 'px';
+  video.style.left   = p.x + 'px';
+  video.style.top    = p.y + 'px';
 }
 
-window.addEventListener('resize', fitVideo);
-
+window.addEventListener('resize', applyVideoCover);
 
 document.getElementById('start-btn').addEventListener('click', startCamera);
 async function startCamera(mode) {
@@ -448,18 +461,40 @@ async function startCamera(mode) {
   facingMode = mode;
   if (stream) stream.getTracks().forEach(t => t.stop());
   try {
-    // スマホ縦持ちに最適化：縦長解像度をリクエスト
+    // iPhoneで広角を最大限引き出す設定
     const isMobile = /iphone|ipad|ipod|android/i.test(navigator.userAgent);
     const constraints = isMobile
-      ? { facingMode: mode, width: { ideal: 1080 }, height: { ideal: 1920 } }
-      : { facingMode: mode, width: { ideal: 1920 }, height: { ideal: 1080 } };
+      ? {
+          facingMode: mode,
+          aspectRatio: { ideal: 9 / 16 },  // 縦長アスペクト比を明示
+          width:  { min: 640, ideal: 1920, max: 3840 },
+          height: { min: 1280, ideal: 1080, max: 2160 },
+          advanced: [{ zoom: 1.0 }]  // ズームを最小に（対応機種のみ）
+        }
+      : {
+          facingMode: mode,
+          width:  { ideal: 1920 },
+          height: { ideal: 1080 }
+        };
     stream = await navigator.mediaDevices.getUserMedia({
       video: constraints,
       audio: false
     });
     video.srcObject = stream;
-    video.addEventListener('loadedmetadata', fitVideo, { once: false });
-    video.addEventListener('resize', fitVideo);
+
+    // ドラえもんカメラと同じ getCover 方式でvideoサイズをJSでセット
+    video.addEventListener('loadedmetadata', applyVideoCover, { once: false });
+    video.addEventListener('resize', applyVideoCover);
+
+    // ズーム対応機種はズームを最小に設定（広角化）
+    try {
+      const track = stream.getVideoTracks()[0];
+      const caps  = track.getCapabilities();
+      if (caps.zoom) {
+        await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] });
+      }
+    } catch(e) { /* ズーム非対応機種は無視 */ }
+
     placeholder.classList.add('hidden');
     shutter.disabled = false;
     showToast('カメラ起動しました');
@@ -699,49 +734,47 @@ function capturePhoto() {
   const vh = video.videoHeight;
   if (!vw || !vh) { showToast('カメラが準備中です'); return; }
 
-  const dispW = stampContainer.clientWidth;
-  const dispH = stampContainer.clientHeight;
-  const videoAspect = vw / vh;
-  const dispAspect  = dispW / dispH;
+  const container = document.getElementById('video-container');
+  const rect = container.getBoundingClientRect();
 
-  // fitVideo()と同じ計算：映像がはみ出している量を求める
-  let renderW, renderH, offsetX, offsetY;
-  if (videoAspect > dispAspect) {
-    renderH = dispH;
-    renderW = dispH * videoAspect;
-  } else {
-    renderW = dispW;
-    renderH = dispW / videoAspect;
-  }
-  offsetX = (dispW - renderW) / 2; // 負の値 = 左にはみ出している
-  offsetY = (dispH - renderH) / 2; // 負の値 = 上にはみ出している
-
-  // 表示エリア(dispW×dispH)が映像内のどの範囲に対応するか
-  // 映像座標系での1pxあたりの表示px
-  const scaleX = vw / renderW;
-  const scaleY = vh / renderH;
-
-  // 表示エリアの左上が映像内のどこに対応するか
-  const srcX = (-offsetX) * scaleX;
-  const srcY = (-offsetY) * scaleY;
-  const srcW = dispW * scaleX;
-  const srcH = dispH * scaleY;
-
-  // 出力canvasは表示エリアと同じアスペクト比（高解像度）
-  canvas.width  = Math.round(srcW);
-  canvas.height = Math.round(srcH);
-  const ctx = canvas.getContext('2d');
-
-  // 映像をクロップして描画（フロントカメラは左右反転）
-  ctx.save();
+  // ── ドラえもんカメラの setBaseCanvasVideo と同じ計算 ──
+  // 1) 映像全体を一旦 tempCanvas に描く（フロントカメラは反転）
+  const tmpCanvas = document.createElement('canvas');
+  tmpCanvas.width  = vw;
+  tmpCanvas.height = vh;
+  const tmpCtx = tmpCanvas.getContext('2d');
   if (facingMode === 'user') {
-    ctx.translate(canvas.width, 0);
-    ctx.scale(-1, 1);
+    tmpCtx.translate(vw, 0);
+    tmpCtx.scale(-1, 1);
   }
-  ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, canvas.width, canvas.height);
-  ctx.restore();
+  tmpCtx.drawImage(video, 0, 0, vw, vh);
+
+  // 2) getContain: 映像(vw×vh)をコンテナ(rect)にcontainした領域を求める
+  //    → tempCanvasのどの部分がコンテナに見えているかを計算
+  const videoAspect    = vw / vh;
+  const containerAspect = rect.width / rect.height;
+  let containW, containH, containX, containY;
+  if (videoAspect > containerAspect) {
+    containW = vw;
+    containH = vw / containerAspect;
+    containX = 0;
+    containY = (vh - containH) / 2;
+  } else {
+    containH = vh;
+    containW = vh * containerAspect;
+    containY = 0;
+    containX = (vw - containW) / 2;
+  }
+
+  // 3) 出力canvas = 4:5固定 (1000×1250)
+  canvas.width  = 1000;
+  canvas.height = 1250;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(tmpCanvas, containX, containY, containW, containH, 0, 0, canvas.width, canvas.height);
 
   // スタンプ座標変換（表示px → canvas px）
+  const dispW = rect.width;
+  const dispH = rect.height;
   const stampScaleX = canvas.width  / dispW;
   const stampScaleY = canvas.height / dispH;
 
@@ -865,6 +898,9 @@ document.addEventListener('keydown', e => {
     if (selectedStamp) { removeStamp(selectedStamp.el); }
   }
 });
+
+// ── 自動起動（HTTPS環境では許可ダイアログが出た後に起動） ──
+startCamera();
 </script>
 </body>
 </html>
