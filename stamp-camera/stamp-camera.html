@@ -171,7 +171,7 @@
     filter: drop-shadow(0 4px 16px rgba(255,111,168,0.5));
     z-index: 10 !important;
   }
-  .stamp img { display: block; pointer-events: none; max-width: none; }
+  .stamp img { display: block; pointer-events: none; max-width: none; background: transparent; }
 
   /* 選択中インジケーター */
   .stamp.selected::after {
@@ -532,6 +532,8 @@ function createStamp(imgSrc, cx, cy, initScale, emoji) {
   img.style.width = '120px';
   img.style.height = '120px';
   img.style.objectFit = 'contain';
+  img.style.background = 'transparent';
+  img.style.display = 'block';
   el.appendChild(img);
 
   // 削除ボタン
