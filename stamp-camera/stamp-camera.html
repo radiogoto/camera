@@ -424,21 +424,37 @@ function getCover(s, r) {
   return { width: w, height: h, x, y };
 }
 
+// 表示クロップの状態をグローバルに保持（撮影時に同じ値を使う）
+let cropState = null; // { srcX, srcY, srcW, srcH } 映像ピクセル座標
+
 function applyVideoCover() {
   const vw = video.videoWidth;
   const vh = video.videoHeight;
   if (!vw || !vh) return;
   const container = document.getElementById('video-container');
-  // getBoundingClientRect() は CSS transform 等で不正確になるため
-  // offsetWidth/offsetHeight を使う（レイアウトサイズを直接取得）
   const cw = container.offsetWidth;
   const ch = container.offsetHeight;
   if (!cw || !ch) return;
+
+  // 表示用: コンテナに対してcoverでvideoを配置
   const p = getCover({ width: cw, height: ch }, { width: vw, height: vh });
   video.style.width  = p.width  + 'px';
   video.style.height = p.height + 'px';
   video.style.left   = p.x + 'px';
   video.style.top    = p.y + 'px';
+
+  // 撮影用: 表示と同じクロップ範囲を映像ピクセル座標で保存
+  // p.x, p.y は負値（はみ出し量）なので、映像上の見えている領域を逆算
+  const scaleX = vw / p.width;   // 表示px → 映像px の比率
+  const scaleY = vh / p.height;
+  cropState = {
+    srcX: (-p.x) * scaleX,
+    srcY: (-p.y) * scaleY,
+    srcW:  cw    * scaleX,
+    srcH:  ch    * scaleY,
+    dispW: cw,
+    dispH: ch,
+  };
 }
 
 // ① ResizeObserver でビューファインダーのサイズ変化を確実に検知
