@@ -429,15 +429,26 @@ function applyVideoCover() {
   const vh = video.videoHeight;
   if (!vw || !vh) return;
   const container = document.getElementById('video-container');
-  const rect = container.getBoundingClientRect();
-  const p = getCover({ width: rect.width, height: rect.height }, { width: vw, height: vh });
+  // getBoundingClientRect() は CSS transform 等で不正確になるため
+  // offsetWidth/offsetHeight を使う（レイアウトサイズを直接取得）
+  const cw = container.offsetWidth;
+  const ch = container.offsetHeight;
+  if (!cw || !ch) return;
+  const p = getCover({ width: cw, height: ch }, { width: vw, height: vh });
   video.style.width  = p.width  + 'px';
   video.style.height = p.height + 'px';
   video.style.left   = p.x + 'px';
   video.style.top    = p.y + 'px';
 }
 
-window.addEventListener('resize', applyVideoCover);
+// ① ResizeObserver でビューファインダーのサイズ変化を確実に検知
+const videoContainer = document.getElementById('video-container');
+const resizeObserver = new ResizeObserver(() => applyVideoCover());
+resizeObserver.observe(videoContainer);
+
+// video の loadedmetadata・resize は一度だけ登録（startCamera の外で管理）
+video.addEventListener('loadedmetadata', applyVideoCover);
+video.addEventListener('resize', applyVideoCover);
 
 document.getElementById('start-btn').addEventListener('click', startCamera);
 async function startCamera(mode) {
@@ -445,32 +456,28 @@ async function startCamera(mode) {
   facingMode = mode;
   if (stream) stream.getTracks().forEach(t => t.stop());
   try {
-    // iPhoneで広角を最大限引き出す設定
     const isMobile = /iphone|ipad|ipod|android/i.test(navigator.userAgent);
     const constraints = isMobile
       ? {
           facingMode: mode,
-          aspectRatio: { ideal: 9 / 16 },  // 縦長アスペクト比を明示
+          aspectRatio: { ideal: 9 / 16 },
           width:  { min: 640, ideal: 1920, max: 3840 },
           height: { min: 1280, ideal: 1080, max: 2160 },
-          advanced: [{ zoom: 1.0 }]  // ズームを最小に（対応機種のみ）
+          advanced: [{ zoom: 1.0 }]
         }
       : {
           facingMode: mode,
           width:  { ideal: 1920 },
           height: { ideal: 1080 }
         };
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: constraints,
-      audio: false
-    });
+    stream = await navigator.mediaDevices.getUserMedia({ video: constraints, audio: false });
     video.srcObject = stream;
 
-    // ドラえもんカメラと同じ getCover 方式でvideoサイズをJSでセット
-    video.addEventListener('loadedmetadata', applyVideoCover, { once: false });
-    video.addEventListener('resize', applyVideoCover);
+    // ② loadedmetadata・resize はここでは登録しない（上で一度だけ登録済み）
+    //    srcObject 差し替え後に手動で一度呼ぶ
+    video.addEventListener('loadedmetadata', applyVideoCover, { once: true });
 
-    // ズーム対応機種はズームを最小に設定（広角化）
+    // ズーム対応機種はズームを最小に設定
     try {
       const track = stream.getVideoTracks()[0];
       const caps  = track.getCapabilities();
@@ -733,21 +740,23 @@ function capturePhoto() {
   }
   tmpCtx.drawImage(video, 0, 0, vw, vh);
 
-  // 2) getContain: 映像(vw×vh)をコンテナ(4:5固定)にcontainした領域を求める
-  //    containerAspect は表示サイズではなく出力比率(1000/1250)で固定
+  // 2) 映像を 4:5 にクロップする（coverと同じ考え方）
+  //    映像の中心から 4:5 の範囲を切り出す
   const videoAspect     = vw / vh;
-  const containerAspect = 1000 / 1250;  // 出力キャンバスと同じ比率で固定
+  const containerAspect = 1000 / 1250;  // 出力 4:5 固定
   let containW, containH, containX, containY;
   if (videoAspect > containerAspect) {
-    containW = vw;
-    containH = vw / containerAspect;
-    containX = 0;
-    containY = (vh - containH) / 2;
-  } else {
+    // 映像が横長 → 高さを合わせて横をクロップ
     containH = vh;
     containW = vh * containerAspect;
     containY = 0;
     containX = (vw - containW) / 2;
+  } else {
+    // 映像が縦長（iPhoneなど）→ 幅を合わせて縦をクロップ
+    containW = vw;
+    containH = vw / containerAspect;
+    containX = 0;
+    containY = (vh - containH) / 2;
   }
 
   // 3) 出力canvas = 4:5固定 (1000×1250)
