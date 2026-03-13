@@ -19,7 +19,9 @@
   }
 
   html, body {
-    height: 100%; background: var(--bg);
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    background: #000;
     color: var(--text);
     font-family: 'Noto Sans JP', sans-serif;
     overflow: hidden;
@@ -28,24 +30,31 @@
   }
 
   #app {
-    position: fixed; inset: 0;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    /* dvh対応：iOS SafariのURL/タブバーを除いた実際の高さ */
+    height: 100dvh;
     background: #000;
     overflow: hidden;
   }
 
   /* ── カメラ映像：全画面背景 ── */
   #video-container {
-    position: absolute; inset: 0;
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
     overflow: hidden;
     z-index: 0;
   }
 
-  /* CSS object-fit:cover で全画面に広げる（JSのgetCoverは不要） */
+  /* CSS object-fit:cover で全画面に広げる */
   #video {
     position: absolute;
-    inset: 0;
+    top: 0; left: 0;
     width: 100%; height: 100%;
     object-fit: cover;
+    /* iOSフロントカメラの左右反転はJS側で対応 */
     display: block;
     pointer-events: none;
   }
@@ -413,29 +422,28 @@ function applyVideoCover() {
   const vh = video.videoHeight;
   if (!vw || !vh) return;
 
+  // フロントカメラはCSS で左右反転表示
+  video.style.transform = facingMode === 'user' ? 'scaleX(-1)' : '';
+
   const cw = window.innerWidth;
   const ch = window.innerHeight;
 
-  // CSS object-fit:cover と同じ計算でcropStateを求める
-  // （表示はCSSが担当。ここでは撮影用クロップ座標だけ計算）
   const isMobile = /iphone|ipad|ipod|android/i.test(navigator.userAgent);
   videoRotated = isMobile && (vw > vh);
 
   let srcVW = vw, srcVH = vh;
-  if (videoRotated) [srcVW, srcVH] = [vh, vw]; // 横長映像は縦横入れ替え
+  if (videoRotated) [srcVW, srcVH] = [vh, vw];
 
   const videoAspect = srcVW / srcVH;
   const screenAspect = cw / ch;
 
   let srcW, srcH, srcX, srcY;
   if (videoAspect > screenAspect) {
-    // 映像が画面より横長 → 上下をフルに使い、左右をクロップ
     srcH = srcVH;
     srcW = srcH * screenAspect;
     srcX = (srcVW - srcW) / 2;
     srcY = 0;
   } else {
-    // 映像が画面より縦長 → 左右をフルに使い、上下をクロップ
     srcW = srcVW;
     srcH = srcW / screenAspect;
     srcX = 0;
