@@ -2,9 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>スタンプカメラ</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700&display=swap');
@@ -21,9 +19,7 @@
   }
 
   html, body {
-    margin: 0; padding: 0;
-    width: 100%; height: 100%;
-    background: #000;
+    height: 100%; background: var(--bg);
     color: var(--text);
     font-family: 'Noto Sans JP', sans-serif;
     overflow: hidden;
@@ -31,120 +27,36 @@
     user-select: none; -webkit-user-select: none;
   }
 
-  /* ── カメラ映像：サイズはJSで制御（表示=撮影を一致させる） ── */
-  #video {
-    position: fixed;
-    display: block;
-    pointer-events: none;
-    z-index: 0;
+  #app { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; position: relative; }
+
+  /* ── ビューファインダー ── */
+  #viewfinder {
+    position: relative;
+    width: 100%;
+    flex: 1;
+    height: 100%;
+    background: #000;
+    overflow: hidden;
+    min-height: 0;
   }
 
-  /* ── スタンプ（映像の上、ただしUIより下） ── */
+  /* video はJSでサイズ・位置をセット */
+  #video-container {
+    position: absolute; inset: 0;
+    overflow: hidden;
+  }
+
+  #video {
+    position: absolute;
+    display: block; pointer-events: none;
+    max-width: none; max-height: none;
+  }
+
+  /* スタンプコンテナ */
   #stamp-container {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
+    position: absolute; inset: 0;
     pointer-events: none;
     z-index: 3;
-  }
-
-  /* ── フラッシュ ── */
-  #flash {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: #fff; opacity: 0;
-    pointer-events: none; z-index: 90;
-    transition: opacity 0.05s;
-  }
-  #flash.pop { opacity: 0.88; }
-
-  /* ── 未起動プレースホルダー ── */
-  #placeholder {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: #06070a;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 14px; z-index: 20;
-  }
-  #placeholder.hidden { display: none !important; }
-  #placeholder p { font-size: 12px; color: var(--muted); letter-spacing: 0.08em; }
-  #start-btn {
-    background: var(--accent2); color: #fff;
-    border: none; font-family: inherit; font-size: 13px;
-    font-weight: 700; letter-spacing: 0.1em;
-    padding: 11px 26px; border-radius: 40px;
-    cursor: pointer; transition: all 0.15s;
-  }
-  #start-btn:hover { background: var(--accent); transform: scale(1.03); }
-
-  /* ── ヒント ── */
-  #hint {
-    position: fixed;
-    bottom: 185px; left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0,0,0,0.55);
-    color: rgba(255,255,255,0.6);
-    font-size: 11px; padding: 5px 14px;
-    border-radius: 14px; letter-spacing: 0.04em;
-    pointer-events: none; z-index: 12;
-    white-space: nowrap; opacity: 1;
-    transition: opacity 0.5s;
-  }
-  #hint.hidden { opacity: 0; }
-
-  /* ── スタンプパレット＋コントロール：一体化 ── */
-  #palette {
-    position: fixed; bottom: 90px; left: 0; right: 0;
-    background: rgba(18,20,26,0.92);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-top: 1px solid rgba(255,255,255,0.10);
-    padding: 10px 12px 0px;
-    z-index: 10;
-  }
-  #palette-label {
-    font-size: 10px; color: var(--muted);
-    letter-spacing: 0.12em; margin-bottom: 8px;
-    text-transform: uppercase;
-  }
-  #palette-items {
-    display: flex; gap: 8px; overflow-x: auto;
-    padding-bottom: 4px;
-    scrollbar-width: none;
-  }
-  #palette-items::-webkit-scrollbar { display: none; }
-
-  .palette-item {
-    flex-shrink: 0;
-    width: 50px; height: 50px;
-    background: rgba(255,255,255,0.15);
-    border: 1.5px solid rgba(255,255,255,0.25);
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-    transition: all 0.15s;
-    overflow: hidden;
-    padding: 5px;
-  }
-  .palette-item img {
-    width: 100%; height: 100%;
-    object-fit: contain;
-    pointer-events: none;
-  }
-  .palette-item:hover { border-color: var(--accent); transform: scale(1.08); }
-  .palette-item:active { transform: scale(0.95); }
-
-  /* ── コントロールバー（パレットと継ぎ目なし） ── */
-  #controls {
-    position: fixed; bottom: 0; left: 0; right: 0;
-    background: rgba(18,20,26,0.92);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    /* border-top なし → パレットと一体化 */
-    padding: 10px 24px 28px;
-    display: flex; align-items: center;
-    justify-content: space-between;
-    z-index: 11; gap: 12px;
   }
 
   /* 個別スタンプ */
@@ -175,7 +87,7 @@
     pointer-events: none;
   }
 
-  /* 削除ボタン（選択中スタンプの右上） */
+  /* 削除ボタン */
   .stamp-del {
     position: absolute;
     top: -12px; right: -12px;
@@ -193,155 +105,266 @@
   }
   .stamp.selected .stamp-del { display: flex; }
 
-  .ctrl-btn {
-    width: 48px; height: 48px; border-radius: 50%;
-    background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15);
-    color: var(--muted); cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.18s; flex-shrink: 0;
+  /* フラッシュ */
+  #flash {
+    position: absolute; inset: 0;
+    background: #fff; opacity: 0;
+    pointer-events: none; z-index: 8;
+    transition: opacity 0.05s;
   }
-  .ctrl-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .ctrl-btn:active { transform: scale(0.92); }
+  #flash.pop { opacity: 0.88; }
 
+  /* ヒント */
+  #hint {
+    position: absolute; bottom: 12px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.55);
+    color: rgba(255,255,255,0.6);
+    font-size: 11px; padding: 5px 14px;
+    border-radius: 14px; letter-spacing: 0.04em;
+    pointer-events: none; z-index: 10;
+    white-space: nowrap; opacity: 1;
+    transition: opacity 0.5s;
+  }
+  #hint.hidden { opacity: 0; }
+
+  /* 未起動プレースホルダー */
+  #placeholder {
+    position: absolute; inset: 0; background: #06070a;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 14px; z-index: 20;
+  }
+  #placeholder.hidden { display: none; }
+  #placeholder p { font-size: 12px; color: var(--muted); letter-spacing: 0.08em; }
+  #start-btn {
+    background: var(--accent2); color: #fff;
+    border: none; font-family: inherit; font-size: 13px;
+    font-weight: 700; letter-spacing: 0.1em;
+    padding: 11px 26px; border-radius: 40px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  #start-btn:hover { background: var(--accent); transform: scale(1.03); }
+
+  /* ── コントロールバー（スタンプ＋シャッター1列） ── */
+  #controls {
+    flex-shrink: 0;
+    background: transparent;
+    border-top: none;
+    padding: 14px 20px 32px;
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    z-index: 20;
+    display: flex; align-items: center;
+    justify-content: center;
+    gap: 10px;
+    z-index: 11;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  #controls::-webkit-scrollbar { display: none; }
+
+  /* スタンプアイテム（旧palette-itemと同デザイン） */
+  .stamp-btn {
+    flex-shrink: 0;
+    width: 52px; height: 52px;
+    background: rgba(0,0,0,0.35);
+    border: 1.5px solid rgba(255,255,255,0.25);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: all 0.18s cubic-bezier(0.34,1.56,0.64,1);
+    overflow: hidden;
+    padding: 7px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  .stamp-btn img {
+    width: 100%; height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+  }
+  .stamp-btn:hover {
+    border-color: rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.12);
+    transform: scale(1.1) translateY(-2px);
+  }
+  .stamp-btn:active { transform: scale(0.92); }
+
+  /* 区切り線 */
+  .ctrl-divider {
+    width: 1px; height: 36px; flex-shrink: 0;
+    background: rgba(255,255,255,0.1);
+  }
+
+  .ctrl-btn {
+    flex-shrink: 0;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: rgba(255,255,255,0.75); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.18s cubic-bezier(0.34,1.56,0.64,1);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  .ctrl-btn:hover {
+    background: rgba(255,255,255,0.13);
+    border-color: rgba(255,255,255,0.3);
+    color: #fff;
+    transform: scale(1.08);
+  }
+  .ctrl-btn:active { transform: scale(0.9); }
+
+  /* シャッター：ドラえもんカメラ風二重リング */
   #shutter {
-    width: 68px; height: 68px; border-radius: 50%;
-    background: #f0f0f8; border: 3px solid var(--accent);
+    width: 72px; height: 72px; border-radius: 50%;
+    background: #fff;
+    border: none;
     cursor: pointer; position: relative; flex-shrink: 0;
-    box-shadow: 0 0 0 4px rgba(255,111,168,0.18);
-    transition: all 0.12s;
+    box-shadow:
+      0 0 0 5px rgba(255,255,255,0.18),
+      0 0 0 8px rgba(255,255,255,0.07),
+      0 4px 20px rgba(0,0,0,0.5);
+    transition: all 0.12s cubic-bezier(0.34,1.56,0.64,1);
   }
+  #shutter::before {
+    content: ''; position: absolute;
+    inset: 5px; border-radius: 50%;
+    background: #f4f4f6;
+    border: 2px solid rgba(0,0,0,0.08);
+  }
+  /* カメラアイコン */
   #shutter::after {
-    content: ''; position: absolute; inset: 4px;
-    border-radius: 50%; background: #f0f0f8; border: 2px solid #ccc;
+    content: '';
+    position: absolute; inset: 0;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='1.6'%3E%3Cpath d='M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z'/%3E%3Ccircle cx='12' cy='13' r='4'/%3E%3C/svg%3E") center/26px no-repeat;
   }
-  #shutter:hover { transform: scale(1.05); box-shadow: 0 0 0 8px rgba(255,111,168,0.22); }
-  #shutter:active { transform: scale(0.93); }
-  #shutter:disabled { opacity: 0.35; cursor: default; transform: none; }
+  #shutter:hover {
+    transform: scale(1.07);
+    box-shadow:
+      0 0 0 6px rgba(255,255,255,0.22),
+      0 0 0 10px rgba(255,255,255,0.09),
+      0 6px 24px rgba(0,0,0,0.55);
+  }
+  #shutter:active {
+    transform: scale(0.93);
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.15), 0 2px 12px rgba(0,0,0,0.4);
+  }
+  #shutter:disabled {
+    opacity: 0.3; cursor: default; transform: none;
+    box-shadow: 0 0 0 4px rgba(255,255,255,0.08);
+  }
 
   #thumb-wrap {
-    width: 48px; height: 48px; border-radius: 8px;
-    background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15);
+    width: 44px; height: 44px; border-radius: 10px;
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(255,255,255,0.25);
     overflow: hidden; cursor: pointer; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    transition: border-color 0.2s;
+    transition: all 0.2s;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
   }
-  #thumb-wrap.has { border-color: var(--accent); }
+  #thumb-wrap.has { border-color: rgba(255,255,255,0.4); }
   #thumb-img { width: 100%; height: 100%; object-fit: cover; display: none; }
   #thumb-wrap.has #thumb-img { display: block; }
-
-  #flip-btn {
-    width: 48px; height: 48px; border-radius: 50%;
-    background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15);
-    color: var(--muted); cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.18s; flex-shrink: 0;
-  }
-  #flip-btn:hover { border-color: var(--accent); color: var(--accent); }
 
   /* ── モーダル ── */
   #modal-bg {
     position: fixed; inset: 0;
-    background: rgba(0,0,0,0.88);
-    z-index: 100;
+    background: rgba(0,0,0,0.85);
     display: flex; align-items: center; justify-content: center;
-    padding: 20px; backdrop-filter: blur(6px);
-    opacity: 0; pointer-events: none; transition: opacity 0.25s;
+    z-index: 100; opacity: 0; pointer-events: none;
+    transition: opacity 0.2s;
   }
-  #modal-bg.open { opacity: 1; pointer-events: all; }
+  #modal-bg.open { opacity: 1; pointer-events: auto; }
   #modal {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 16px; padding: 18px; width: 100%; max-width: 400px;
-    display: flex; flex-direction: column; gap: 14px;
-    transform: translateY(24px); transition: transform 0.25s;
+    background: var(--surface); border-radius: 16px;
+    padding: 16px; max-width: 90vw; max-height: 90vh;
+    display: flex; flex-direction: column; gap: 12px;
+    transform: translateY(20px); transition: transform 0.2s;
   }
   #modal-bg.open #modal { transform: translateY(0); }
-  #modal-photo { width: 100%; border-radius: 10px; display: block; }
+  #modal-photo { max-width: 100%; max-height: 65vh; border-radius: 10px; object-fit: contain; }
   #modal-actions { display: flex; gap: 10px; }
   .m-btn {
     flex: 1; padding: 11px; border-radius: 10px; border: none;
     font-family: inherit; font-size: 13px; font-weight: 700;
-    letter-spacing: 0.08em; cursor: pointer; transition: all 0.15s;
+    cursor: pointer; transition: all 0.15s;
   }
+  .close-btn { background: var(--border); color: var(--muted); }
+  .close-btn:hover { background: #3a3f4e; color: var(--text); }
   .m-btn.save { background: var(--accent2); color: #fff; }
   .m-btn.save:hover { background: var(--accent); }
-  .m-btn.close-btn { background: transparent; border: 1px solid var(--border); color: var(--muted); }
-  .m-btn.close-btn:hover { border-color: #da3633; color: #da3633; }
 
-  #canvas { display: none; }
+  /* トースト */
   #toast {
-    position: fixed; bottom: 90px; left: 50%;
+    position: fixed; bottom: 100px; left: 50%;
     transform: translateX(-50%);
-    background: rgba(255,111,168,0.15); border: 1px solid var(--accent);
-    color: var(--accent); font-size: 12px; padding: 7px 16px;
-    border-radius: 20px; letter-spacing: 0.08em;
-    pointer-events: none; opacity: 0; transition: opacity 0.3s;
+    background: rgba(30,33,42,0.95); color: var(--text);
+    padding: 8px 18px; border-radius: 20px;
+    font-size: 12px; letter-spacing: 0.06em;
+    opacity: 0; transition: opacity 0.3s; pointer-events: none;
     z-index: 50; white-space: nowrap;
   }
   #toast.show { opacity: 1; }
-
-  #stamp-upload-input, #custom-stamp-input { display: none; }
 </style>
 </head>
 <body>
-  <!-- カメラ映像（全画面背景） -->
-  <video id="video" autoplay playsinline muted></video>
+<div id="app">
 
-  <!-- スタンプ・フラッシュ・ヒント（映像の上） -->
-  <div id="stamp-container"></div>
-  <div id="flash"></div>
-  <div id="hint">スタンプをタップして追加 ✦ ドラッグで移動 ✦ ピンチで拡縮</div>
-
-  <!-- 未起動プレースホルダー -->
-  <div id="placeholder">
-    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1.5">
-      <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
-      <circle cx="12" cy="13" r="4"/>
-    </svg>
-    <p>カメラへのアクセスを許可してください</p>
-    <button id="start-btn">カメラを起動</button>
-  </div>
-
-  <!-- スタンプパレット -->
-  <div id="palette">
-    <div id="palette-label">スタンプ — タップして追加</div>
-    <div id="palette-items">
-      <div class="palette-item" data-stamp="data:image/png;base64,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">
-        <img src="data:image/png;base64,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" alt="スタンプ1">
-      </div>
-      <div class="palette-item" data-stamp="data:image/png;base64,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">
-        <img src="data:image/png;base64,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" alt="スタンプ2">
-      </div>
-      <div class="palette-item" data-stamp="data:image/png;base64,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">
-        <img src="data:image/png;base64,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" alt="スタンプ3">
-      </div>
+  <!-- ビューファインダー -->
+  <div id="viewfinder">
+    <div id="video-container">
+      <video id="video" autoplay playsinline muted></video>
+      <div id="stamp-container"></div>
     </div>
-  </div>
-
-  <!-- コントロール -->
-  <div id="controls">
-    <button class="ctrl-btn" id="undo-btn" title="最後のスタンプを削除">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-        <path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/>
+    <div id="flash"></div>
+    <div id="hint">タップで追加  •  ドラッグで移動  •  ピンチで拡縮</div>
+    <div id="placeholder">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1.5">
+        <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+        <circle cx="12" cy="13" r="4"/>
       </svg>
+      <p>カメラへのアクセスを許可してください</p>
+      <button id="start-btn">カメラを起動</button>
+    </div>
+
+  <!-- コントロール（スタンプ＋シャッター1列） -->
+  <div id="controls">
+    <!-- スタンプボタン群 -->
+    <button class="stamp-btn" data-stamp="data:image/png;base64,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">
+      <img src="data:image/png;base64,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" alt="スタンプ1">
+    </button>
+    <button class="stamp-btn" data-stamp="data:image/png;base64,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">
+      <img src="data:image/png;base64,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" alt="スタンプ2">
+    </button>
+    <button class="stamp-btn" data-stamp="data:image/png;base64,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">
+      <img src="data:image/png;base64,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" alt="スタンプ3">
     </button>
 
+    <!-- 区切り -->
+    <div class="ctrl-divider"></div>
+
+    <!-- シャッター -->
+    <button id="shutter" disabled></button>
+
+    <!-- 区切り -->
+    <div class="ctrl-divider"></div>
+
+    <!-- カメラ切替 + サムネイル -->
     <button class="ctrl-btn" id="flip-btn" title="カメラ切替">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
         <path d="M1 4v6h6"/><path d="M23 20v-6h-6"/>
         <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
       </svg>
     </button>
-
-    <button id="shutter" disabled></button>
-
-    <button class="ctrl-btn" id="clear-btn" title="全消去">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
-      </svg>
-    </button>
-
     <div id="thumb-wrap">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.5">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1.5">
         <rect x="3" y="3" width="18" height="18" rx="2"/>
         <circle cx="8.5" cy="8.5" r="1.5"/>
         <polyline points="21 15 16 10 5 21"/>
@@ -350,13 +373,17 @@
     </div>
   </div>
 
+  </div>
+
+</div>
+
 <!-- モーダル -->
 <div id="modal-bg">
   <div id="modal">
     <img id="modal-photo" alt="撮影した写真">
     <div id="modal-actions">
       <button class="m-btn close-btn" id="modal-close">閉じる</button>
-      <button class="m-btn save" id="modal-save" id="modal-save">💾 保存</button>
+      <button class="m-btn save" id="modal-save">保存する</button>
     </div>
   </div>
 </div>
@@ -365,15 +392,13 @@
 <div id="toast"></div>
 
 <script>
-const video = document.getElementById('video');
+const video         = document.getElementById('video');
 const stampContainer= document.getElementById('stamp-container');
 const placeholder   = document.getElementById('placeholder');
 const flash         = document.getElementById('flash');
 const hint          = document.getElementById('hint');
 const shutter       = document.getElementById('shutter');
 const flipBtn       = document.getElementById('flip-btn');
-const clearBtn      = document.getElementById('clear-btn');
-const undoBtn       = document.getElementById('undo-btn');
 const thumbWrap     = document.getElementById('thumb-wrap');
 const thumbImg      = document.getElementById('thumb-img');
 const canvas        = document.getElementById('canvas');
@@ -388,65 +413,40 @@ let facingMode = 'user';
 let lastPhoto = null;
 let selectedStamp = null;
 let stampZIndex = 10;
-let stamps = []; // {el, emoji, imgSrc, x, y, scale, rot}
+let stamps = [];
 
-
-// cropState: capturePhoto が使う「映像のどこを切り出すか」の情報
-let cropState = null;
+// ── getCover計算（表示と撮影を一致させる） ──
+function getCover(s, r) {
+  const sAspect = s.width / s.height;
+  const rAspect = r.width / r.height;
+  let w, h, x, y;
+  if (sAspect > rAspect) {
+    w = s.width; h = w / rAspect; x = 0; y = -(h - s.height) / 2;
+  } else {
+    h = s.height; w = h * rAspect; y = 0; x = -(w - s.width) / 2;
+  }
+  return { width: w, height: h, x, y };
+}
 
 function applyVideoCover() {
   const vw = video.videoWidth;
   const vh = video.videoHeight;
   if (!vw || !vh) return;
-
-  const sw = window.innerWidth;   // 画面幅
-  const sh = window.innerHeight;  // 画面高さ
-
-  // CSS object-fit:cover と同じ計算
-  // 映像アスペクト比と画面アスペクト比を比較してスケールを決める
-  const videoAspect  = vw / vh;
-  const screenAspect = sw / sh;
-
-  let renderW, renderH;
-  if (videoAspect > screenAspect) {
-    // 映像が横長 → 高さを画面に合わせ、左右をはみ出させる
-    renderH = sh;
-    renderW = sh * videoAspect;
-  } else {
-    // 映像が縦長 → 幅を画面に合わせ、上下をはみ出させる
-    renderW = sw;
-    renderH = sw / videoAspect;
-  }
-
-  const offsetX = (sw - renderW) / 2;  // 負の値 = 左にはみ出す量
-  const offsetY = (sh - renderH) / 2;  // 負の値 = 上にはみ出す量
-
-  // ── 表示：videoをはみ出した状態で配置、overflowはbodyで隠れる ──
-  const isFront = facingMode === 'user';
-  video.style.width     = renderW + 'px';
-  video.style.height    = renderH + 'px';
-  video.style.left      = offsetX + 'px';
-  video.style.top       = offsetY + 'px';
-  video.style.transform = isFront ? 'scaleX(-1)' : 'none';
-  video.style.transformOrigin = 'center center';
-
-  // ── cropState：撮影時に同じ範囲を切り出す ──
-  // 映像ピクセル → 表示ピクセルのスケール
-  const scaleX = renderW / vw;
-  const scaleY = renderH / vh;
-  // 画面左上が映像のどこに対応するか（映像座標系）
-  const srcX = -offsetX / scaleX;
-  const srcY = -offsetY / scaleY;
-  const srcW =  sw / scaleX;
-  const srcH =  sh / scaleY;
-
-  cropState = { srcX, srcY, srcW, srcH, dispW: sw, dispH: sh, rotated: false };
+  const container = document.getElementById('video-container');
+  const cw = container.offsetWidth;
+  const ch = container.offsetHeight;
+  if (!cw || !ch) return;
+  const p = getCover({ width: cw, height: ch }, { width: vw, height: vh });
+  video.style.width  = p.width  + 'px';
+  video.style.height = p.height + 'px';
+  video.style.left   = p.x + 'px';
+  video.style.top    = p.y + 'px';
 }
 
-// 映像サイズ確定時・画面リサイズ時にcropStateを更新
+const resizeObserver = new ResizeObserver(() => applyVideoCover());
+resizeObserver.observe(document.getElementById('video-container'));
 video.addEventListener('loadedmetadata', applyVideoCover);
 video.addEventListener('resize', applyVideoCover);
-window.addEventListener('resize', applyVideoCover);
 
 document.getElementById('start-btn').addEventListener('click', startCamera);
 async function startCamera(mode) {
@@ -470,18 +470,13 @@ async function startCamera(mode) {
         };
     stream = await navigator.mediaDevices.getUserMedia({ video: constraints, audio: false });
     video.srcObject = stream;
+    video.addEventListener('loadedmetadata', applyVideoCover, { once: true });
 
-    // フロントカメラは左右反転表示
-    video.style.transform = mode === 'user' ? 'scaleX(-1)' : 'none';
-
-    // ズーム対応機種はズームを最小に設定
     try {
       const track = stream.getVideoTracks()[0];
       const caps  = track.getCapabilities();
-      if (caps.zoom) {
-        await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] });
-      }
-    } catch(e) { /* ズーム非対応機種は無視 */ }
+      if (caps.zoom) await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] });
+    } catch(e) {}
 
     placeholder.classList.add('hidden');
     shutter.disabled = false;
@@ -502,14 +497,11 @@ flipBtn.addEventListener('click', () => {
   setTimeout(() => { flipBtn.style.transform = ''; }, 420);
 });
 
-// ── スタンプパレット：画像スタンプ ──
-document.querySelectorAll('.palette-item[data-stamp]').forEach(item => {
-  item.addEventListener('click', () => {
-    addImageStamp(item.dataset.stamp);
-  });
+// ── スタンプパレット ──
+document.querySelectorAll('.stamp-btn[data-stamp]').forEach(item => {
+  item.addEventListener('click', () => addImageStamp(item.dataset.stamp));
 });
 
-// ── スタンプを追加（画像ファイル） ──
 function addImageStamp(src) {
   const vw = stampContainer.clientWidth;
   const vh = stampContainer.clientHeight;
@@ -518,7 +510,6 @@ function addImageStamp(src) {
   showHintBriefly();
 }
 
-// ── スタンプDOM生成 ──
 function createStamp(imgSrc, cx, cy, initScale, emoji) {
   const el = document.createElement('div');
   el.className = 'stamp';
@@ -530,28 +521,18 @@ function createStamp(imgSrc, cx, cy, initScale, emoji) {
   img.style.height = '120px';
   img.style.objectFit = 'contain';
   img.style.background = 'transparent';
-  img.style.display = 'block';
   el.appendChild(img);
 
-  // 削除ボタン
   const del = document.createElement('div');
   del.className = 'stamp-del';
   del.textContent = '×';
-  del.addEventListener('click', e => {
-    e.stopPropagation();
-    removeStamp(el);
-  });
+  del.addEventListener('click', e => { e.stopPropagation(); removeStamp(el); });
   el.appendChild(del);
 
-  // 状態
   const state = { el, imgSrc, emoji, x: cx, y: cy, scale: initScale, rot: 0 };
   stamps.push(state);
-
   applyStampTransform(state);
-
-  // イベント
   attachStampEvents(el, state);
-
   stampContainer.appendChild(el);
   selectStamp(el, state);
   return state;
@@ -570,14 +551,12 @@ function removeStamp(el) {
 }
 
 function selectStamp(el, state) {
-  // 全選択解除
   document.querySelectorAll('.stamp.selected').forEach(s => s.classList.remove('selected'));
   el.classList.add('selected');
   el.style.zIndex = ++stampZIndex;
   selectedStamp = state;
 }
 
-// 背景タップで選択解除
 stampContainer.addEventListener('pointerdown', e => {
   if (e.target === stampContainer || e.target === video) {
     document.querySelectorAll('.stamp.selected').forEach(s => s.classList.remove('selected'));
@@ -585,48 +564,26 @@ stampContainer.addEventListener('pointerdown', e => {
   }
 });
 
-// ── スタンプのドラッグ＆ピンチ（シンプル・確実な実装） ──
 function attachStampEvents(el, state) {
-  // pointerId → 開始時のクライアント座標
   const ptrs = {};
-
-  // ドラッグ開始時のスタンプ位置とポインター位置（1本指用）
-  let drag1 = null; // { startX, startY, startStampX, startStampY }
-
-  // ピンチ開始時の状態（2本指用）
-  let pinch = null; // { dist, startScale, midX, midY, startStampX, startStampY }
+  let drag1 = null;
+  let pinch = null;
 
   el.addEventListener('pointerdown', e => {
-    if (e.target.classList.contains('stamp-del')) return; // 削除ボタンは除外
-    e.preventDefault();
-    e.stopPropagation();
+    if (e.target.classList.contains('stamp-del')) return;
+    e.preventDefault(); e.stopPropagation();
     el.setPointerCapture(e.pointerId);
-
     ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
     selectStamp(el, state);
     el.classList.add('active');
-
     const ids = Object.keys(ptrs);
     if (ids.length === 1) {
-      // 1本指ドラッグ開始
-      drag1 = {
-        startClientX: e.clientX,
-        startClientY: e.clientY,
-        startStampX: state.x,
-        startStampY: state.y
-      };
+      drag1 = { startClientX: e.clientX, startClientY: e.clientY, startStampX: state.x, startStampY: state.y };
       pinch = null;
     } else if (ids.length === 2) {
-      // 2本指ピンチ開始
       const a = ptrs[ids[0]], b = ptrs[ids[1]];
-      pinch = {
-        dist: Math.hypot(b.x - a.x, b.y - a.y),
-        startScale: state.scale,
-        midX: (a.x + b.x) / 2,
-        midY: (a.y + b.y) / 2,
-        startStampX: state.x,
-        startStampY: state.y
-      };
+      pinch = { dist: Math.hypot(b.x-a.x, b.y-a.y), startScale: state.scale,
+                midX: (a.x+b.x)/2, midY: (a.y+b.y)/2, startStampX: state.x, startStampY: state.y };
       drag1 = null;
     }
   });
@@ -635,29 +592,19 @@ function attachStampEvents(el, state) {
     if (!(e.pointerId in ptrs)) return;
     e.preventDefault();
     ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
-
     const ids = Object.keys(ptrs);
     const rect = stampContainer.getBoundingClientRect();
-    // stampContainerの表示スケール比（CSS transformで縮小されている場合の補正）
     const scX = stampContainer.offsetWidth  / rect.width;
     const scY = stampContainer.offsetHeight / rect.height;
-
     if (ids.length === 1 && drag1) {
-      // 1本指：ドラッグ
-      const dx = (e.clientX - drag1.startClientX) * scX;
-      const dy = (e.clientY - drag1.startClientY) * scY;
-      state.x = drag1.startStampX + dx;
-      state.y = drag1.startStampY + dy;
+      state.x = drag1.startStampX + (e.clientX - drag1.startClientX) * scX;
+      state.y = drag1.startStampY + (e.clientY - drag1.startClientY) * scY;
       applyStampTransform(state);
-
     } else if (ids.length >= 2 && pinch) {
-      // 2本指：ピンチ＋パン
       const a = ptrs[ids[0]], b = ptrs[ids[1]];
-      const dist = Math.hypot(b.x - a.x, b.y - a.y);
+      const dist = Math.hypot(b.x-a.x, b.y-a.y);
       state.scale = Math.min(5, Math.max(0.15, pinch.startScale * (dist / pinch.dist)));
-
-      const midX = (a.x + b.x) / 2;
-      const midY = (a.y + b.y) / 2;
+      const midX = (a.x+b.x)/2, midY = (a.y+b.y)/2;
       state.x = pinch.startStampX + (midX - pinch.midX) * scX;
       state.y = pinch.startStampY + (midY - pinch.midY) * scY;
       applyStampTransform(state);
@@ -668,47 +615,19 @@ function attachStampEvents(el, state) {
     delete ptrs[e.pointerId];
     const ids = Object.keys(ptrs);
     el.classList.remove('active');
-
-    if (ids.length === 0) {
-      drag1 = null;
-      pinch = null;
-    } else if (ids.length === 1) {
-      // 指が1本になったらドラッグに切り替え
-      const remaining = ptrs[ids[0]];
-      drag1 = {
-        startClientX: remaining.x,
-        startClientY: remaining.y,
-        startStampX: state.x,
-        startStampY: state.y
-      };
-      pinch = null;
-      el.classList.add('active');
+    if (ids.length === 0) { drag1 = null; pinch = null; }
+    else if (ids.length === 1) {
+      const rem = ptrs[ids[0]];
+      drag1 = { startClientX: rem.x, startClientY: rem.y, startStampX: state.x, startStampY: state.y };
+      pinch = null; el.classList.add('active');
     }
   };
-
   el.addEventListener('pointerup',     onEnd);
   el.addEventListener('pointercancel', onEnd);
 }
 
-// ── 全消去 ──
-clearBtn.addEventListener('click', () => {
-  stampContainer.innerHTML = '';
-  stamps = [];
-  selectedStamp = null;
-  showToast('スタンプを全消去しました');
-});
-
-// ── アンドゥ（最後のスタンプを削除） ──
-undoBtn.addEventListener('click', () => {
-  if (stamps.length === 0) return;
-  const last = stamps[stamps.length - 1];
-  removeStamp(last.el);
-  showToast('元に戻しました');
-});
-
 // ── シャッター ──
 shutter.addEventListener('click', () => {
-  // 選択状態を一時解除して撮影
   document.querySelectorAll('.stamp.selected').forEach(s => s.classList.remove('selected'));
   doFlash();
   setTimeout(capturePhoto, 100);
@@ -722,45 +641,58 @@ function doFlash() {
 function capturePhoto() {
   const vw = video.videoWidth;
   const vh = video.videoHeight;
-  if (!vw || !vh)   { showToast('カメラが準備中です'); return; }
-  if (!cropState)   { showToast('カメラが準備中です'); return; }
+  if (!vw || !vh) { showToast('カメラが準備中です'); return; }
 
-  const { srcX, srcY, srcW, srcH, dispW, dispH } = cropState;
-  const dpr = Math.min(window.devicePixelRatio || 1, 3);
-  canvas.width  = Math.round(dispW * dpr);
-  canvas.height = Math.round(dispH * dpr);
+  const dispW = stampContainer.clientWidth;
+  const dispH = stampContainer.clientHeight;
+  const videoAspect = vw / vh;
+  const dispAspect  = dispW / dispH;
+
+  let renderW, renderH;
+  if (videoAspect > dispAspect) {
+    renderH = dispH; renderW = dispH * videoAspect;
+  } else {
+    renderW = dispW; renderH = dispW / videoAspect;
+  }
+  const offsetX = (dispW - renderW) / 2;
+  const offsetY = (dispH - renderH) / 2;
+
+  const scaleX = vw / renderW;
+  const scaleY = vh / renderH;
+  const srcX = (-offsetX) * scaleX;
+  const srcY = (-offsetY) * scaleY;
+  const srcW = dispW * scaleX;
+  const srcH = dispH * scaleY;
+
+  canvas.width  = Math.round(srcW);
+  canvas.height = Math.round(srcH);
   const ctx = canvas.getContext('2d');
 
+  ctx.save();
   if (facingMode === 'user') {
-    // フロントカメラ：左右反転して描画
-    ctx.save();
     ctx.translate(canvas.width, 0);
     ctx.scale(-1, 1);
-    ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, canvas.width, canvas.height);
-    ctx.restore();
-  } else {
-    ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, canvas.width, canvas.height);
   }
+  ctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, canvas.width, canvas.height);
+  ctx.restore();
 
-  // スタンプ描画
-  const scaleX = canvas.width  / dispW;
-  const scaleY = canvas.height / dispH;
-  const sorted = [...stamps].sort((a, b) =>
-    parseInt(a.el.style.zIndex) - parseInt(b.el.style.zIndex)
-  );
+  const stampScaleX = canvas.width  / dispW;
+  const stampScaleY = canvas.height / dispH;
+
+  const sorted = [...stamps].sort((a, b) => parseInt(a.el.style.zIndex) - parseInt(b.el.style.zIndex));
   let pending = sorted.length;
   if (pending === 0) { finalize(); return; }
 
   sorted.forEach(state => {
     const img = new Image();
     img.onload = () => {
-      const cx = state.x * scaleX;
-      const cy = state.y * scaleY;
-      const sw = 120 * state.scale * scaleX;
-      const sh = 120 * state.scale * scaleY;
+      const cx = state.x * stampScaleX;
+      const cy = state.y * stampScaleY;
+      const sw = 120 * state.scale * stampScaleX;
+      const sh = 120 * state.scale * stampScaleY;
       ctx.save();
       ctx.translate(cx, cy);
-      ctx.drawImage(img, -sw / 2, -sh / 2, sw, sh);
+      ctx.drawImage(img, -sw/2, -sh/2, sw, sh);
       ctx.restore();
       pending--;
       if (pending === 0) finalize();
@@ -781,14 +713,11 @@ function capturePhoto() {
 // ── 保存 ──
 modalSave.addEventListener('click', async () => {
   if (!lastPhoto) return;
-
   const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const filename = `stamp-photo-${ts}.jpg`;
-
-  const isIOS     = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const isAndroid = /android/i.test(navigator.userAgent);
 
-  // ── iOS Safari：Web Share API → 「画像を保存」でカメラロールへ ──
   if (isIOS && navigator.canShare) {
     try {
       const res  = await fetch(lastPhoto);
@@ -800,27 +729,16 @@ modalSave.addEventListener('click', async () => {
         modalBg.classList.remove('open');
         return;
       }
-    } catch(e) {
-      if (e.name === 'AbortError') return; // ユーザーがキャンセル
-    }
+    } catch(e) { if (e.name === 'AbortError') return; }
   }
 
-  // ── Android Chrome：ダウンロード → ギャラリーに自動追加 ──
-  // ── PC：通常ダウンロード ──
   const a = document.createElement('a');
-  a.download = filename;
-  a.href = lastPhoto;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-
-  if (isAndroid) {
-    showToast('ギャラリーの「ダウンロード」に保存されました！');
-  } else {
-    showToast('保存しました！');
-  }
+  a.download = filename; a.href = lastPhoto;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  showToast(isAndroid ? 'ギャラリーに保存されました！' : '保存しました！');
   modalBg.classList.remove('open');
 });
+
 modalClose.addEventListener('click', () => modalBg.classList.remove('open'));
 modalBg.addEventListener('click', e => { if (e.target === modalBg) modalBg.classList.remove('open'); });
 thumbWrap.addEventListener('click', () => {
@@ -829,7 +747,6 @@ thumbWrap.addEventListener('click', () => {
   modalBg.classList.add('open');
 });
 
-// ── ヒント ──
 let hintTimer;
 function showHintBriefly() {
   hint.classList.remove('hidden');
@@ -837,7 +754,6 @@ function showHintBriefly() {
   hintTimer = setTimeout(() => hint.classList.add('hidden'), 3500);
 }
 
-// ── トースト ──
 let toastTimer;
 function showToast(msg) {
   toastEl.textContent = msg;
@@ -846,23 +762,16 @@ function showToast(msg) {
   toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
 }
 
-// ── 保存ボタンのラベルを端末に合わせて変更 ──
-const _isIOS     = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const _isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 const _isAndroid = /android/i.test(navigator.userAgent);
 document.getElementById('modal-save').textContent =
-  _isIOS     ? '📷 カメラロールに保存' :
-  _isAndroid ? '📥 ギャラリーに保存' :
-               '💾 保存 (JPEG)';
+  _isIOS ? '📷 カメラロールに保存' : _isAndroid ? '📥 ギャラリーに保存' : '💾 保存 (JPEG)';
 
-// ── キーボード ──
 document.addEventListener('keydown', e => {
   if (e.code === 'Space' && !shutter.disabled) { e.preventDefault(); shutter.click(); }
-  if (e.code === 'Delete' || e.code === 'Backspace') {
-    if (selectedStamp) { removeStamp(selectedStamp.el); }
-  }
+  if ((e.code === 'Delete' || e.code === 'Backspace') && selectedStamp) removeStamp(selectedStamp.el);
 });
 
-// ── 自動起動（HTTPS環境では許可ダイアログが出た後に起動） ──
 startCamera();
 </script>
 </body>
